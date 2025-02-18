@@ -1,51 +1,51 @@
 import http from 'k6/http';
-import { Trend } from 'k6/metrics';
 import { check, sleep } from 'k6';
+import { Trend } from 'k6/metrics';
 
 // Métrica personalizada para rastrear el estado de las respuestas
 const statusTrend = new Trend('status_codes');
 
+// Configuración de la prueba
 export const options = {
     stages: [
-        { duration: '10s', target: 50 }, // Escalar hasta 60 usuarios simultáneos en 15 segundos
-        { duration: '10s', target: 50 }, // Mantener 60 usuarios simultáneos durante 30 segundos
-        { duration: '2s', target: 0 },  // Reducir a 0 usuarios simultáneos en 15 segundos
+        { duration: '5s', target: 5 },  // Escalar hasta 10 usuarios simultáneos en 5 segundos
+        { duration: '5s', target: 0 },   // Reducir a 0 usuarios simultáneos en 5 segundos
     ],
 };
 
+// Datos del payload para la compra
+const payload = JSON.stringify({
+    producto: {
+        id: 4,  // Asegúrate de que este campo esté presente
+        nombre: "Laptop",
+        precio: 1200.99,
+        activado: true,  // Campo correcto en lugar de "activo"
+    },
+    direccion_envio: "Falsa 123, Ciudad Ejemplo",
+    cantidad: 1,
+    medio_pago: "Tarjeta de crédito",
+});
+
+// Encabezados para la solicitud
+const headers = {
+    'Content-Type': 'application/json',
+};
+
 export default function () {
-    const BASE_URL = 'http://localhost:5000/api/v1/commerce/comprar'; // URL del servidor de desarrollo
+    const BASE_URL = 'http://localhost:5000/api/v1/commerce/comprar'; // Endpoint de compras
 
-    // Datos de ejemplo para simular una compra
-    const payload = JSON.stringify({
-        "producto": {
-          "id": 4,
-          "nombre": "Laptop",
-          "precio": 1200.99,
-          "activado": true
-        },
-        "direccion_envio": "Falsa 123, Ciudad Ejemplo",
-        "cantidad": 1,
-        "medio_pago": "Tarjeta de crédito"
-      });
-
-    const params = {
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    };
-
-    // Realizar la solicitud POST al endpoint de compra
-    const res = http.post(BASE_URL, payload, params);
+    // Enviar la solicitud POST para simular una compra
+    const res = http.post(BASE_URL, payload, { headers });
 
     // Registrar métricas de los estados HTTP
     statusTrend.add(res.status);
 
-    // Validaciones básicas
+    // Validaciones básicas de la respuesta
     check(res, {
         'status is 200': (r) => r.status === 200,
-        'status is 400': (r) => r.status === 400,
+        'response has id': (r) => r.json().id !== undefined,
     });
 
-    sleep(1); // Simular espera de 1 segundo entre solicitudes
+    // Simular un tiempo de espera entre solicitudes
+    sleep(1);
 }

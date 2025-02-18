@@ -4,38 +4,34 @@ import requests
 from app.mapping import StockSchema
 from app.models import Stock
 from app.models.carrito import Carrito
-from tenacity import retry, stop_after_attempt, wait_random
-import threading
 
 class ClienteInventarioService:
     
     def __init__(self):
         self.stock = Stock()
         self.URL = os.getenv('MSINVENTARIOS_URL', 'http://localhost:5004/api/v1/')
-        self._lock = threading.Lock()
-
-    @retry(wait=wait_random(min=1, max=2), stop=stop_after_attempt(3))
+    
     def retirar_producto(self, carrito: Carrito) -> None:
-       with self._lock:
-           self.stock.producto = carrito.producto.id
-           self.stock.cantidad = carrito.cantidad
-           self.stock.entrada_salida = 2
-           
-           stock_schema = StockSchema()
-           data = stock_schema.dump(self.stock)
-           data.pop("id", None)        
-           data.pop("deleted_at", None)
+        self.stock.producto = carrito.producto.id
+        self.stock.cantidad = carrito.cantidad
+        self.stock.entrada_salida = 2
+        stock_schema = StockSchema()
+        data=stock_schema.dump(self.stock)
+        logging.info(data)
+        # Eliminamos el campo "id" si está presente
+        data.pop("id", None)        
+        data.pop("deleted_at", None)
+        r = requests.post(f'{self.URL}inventarios/retirar', json=data)
 
-           r = requests.post(f'{self.URL}inventarios/retirar', json=data)
-
-           if r.status_code == 200:
-               self.stock = stock_schema.load(r.json())
-               logging.info(f"Stock registrado id: {self.stock.id}")
-           else:
-               logging.error(f"Error en el microservicio Stock")
-               raise BaseException("Error en el microservicio Stock")
+        if r.status_code == 200:
+            logging.info(f"Stock <- {r.json()}")
            
-    @retry(wait=wait_random(min=1, max=2), stop=stop_after_attempt(3))
+            self.stock = stock_schema.load( r.json() )
+            logging.info(f"Stock registrado id: {self.stock.id}")
+        else:
+            logging.error(f"Error en el microservicio Stock")
+            raise BaseException("Error en el microservicio Stock")
+
     def ingresar_producto(self) -> None:
         
         if not self.stock.id:
